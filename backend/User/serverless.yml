@@ -1,0 +1,134 @@
+org: mateormz
+service: user-api
+
+provider:
+  name: aws
+  runtime: python3.9
+  iam:
+    role: arn:aws:iam::637423324074:role/LabRole
+  memorySize: 1024
+  timeout: 30
+  environment:
+    TABLE_NAME: ${sls:stage}-hotel-users
+    INDEXLSI1_USERS: tenant-email-index
+    INDEXGSI1_USERS: email-index
+    TABLE_TOKENS: ${sls:stage}-hotel-tokens
+    INDEXLSI1_TOKENS: tenant-expiration-index
+    INDEXGSI1_TOKENS: token-index
+    SERVICE_NAME: user-api
+    STAGE: ${sls:stage}
+
+functions:
+  hotel_registerUser:
+    handler: register.lambda_handler
+    events:
+      - http:
+          path: /user/register
+          method: post
+          cors: true
+          integration: lambda
+
+  hotel_loginUser:
+    handler: login.lambda_handler
+    events:
+      - http:
+          path: /user/login
+          method: post
+          cors: true
+          integration: lambda
+
+  hotel_validateUserToken:
+    handler: validateToken.lambda_handler
+    events:
+      - http:
+          path: /user/validateToken
+          method: post
+          cors: true
+          integration: lambda
+
+  hotel_getUser:
+    handler: getUser.lambda_handler
+    events:
+      - http:
+          path: /user/getUser
+          method: post
+          cors: true
+          integration: lambda
+
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: tenant_id
+            AttributeType: S
+          - AttributeName: user_id
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenant_id
+            KeyType: HASH
+          - AttributeName: user_id
+            KeyType: RANGE
+        LocalSecondaryIndexes:
+          - IndexName: ${self:provider.environment.INDEXLSI1_USERS}
+            KeySchema:
+              - AttributeName: tenant_id
+                KeyType: HASH
+              - AttributeName: email
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        GlobalSecondaryIndexes:
+          - IndexName: ${self:provider.environment.INDEXGSI1_USERS}
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+              - AttributeName: tenant_id
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    TokensTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_TOKENS}
+        AttributeDefinitions:
+          - AttributeName: tenant_id
+            AttributeType: S
+          - AttributeName: token
+            AttributeType: S
+          - AttributeName: expiration
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenant_id
+            KeyType: HASH
+          - AttributeName: token
+            KeyType: RANGE
+        LocalSecondaryIndexes:
+          - IndexName: ${self:provider.environment.INDEXLSI1_TOKENS}
+            KeySchema:
+              - AttributeName: tenant_id
+                KeyType: HASH
+              - AttributeName: expiration
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        GlobalSecondaryIndexes:
+          - IndexName: ${self:provider.environment.INDEXGSI1_TOKENS}
+            KeySchema:
+              - AttributeName: token
+                KeyType: HASH
+              - AttributeName: tenant_id
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
